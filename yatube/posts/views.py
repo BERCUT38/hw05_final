@@ -156,14 +156,14 @@ def profile_follow(request, username):
     user = request.user
     if Follow.objects.filter(user=user, author=author).exists():
         return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
-    else:    
+    else:
         if author != user:
             Follow.objects.create(user=user, author=author)
             return redirect(
                 'posts:profile',
                 username=username
             )
-        return HttpResponseRedirect(request.META.get('HTTP_REFERER'))    
+        return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
     return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
 
 
