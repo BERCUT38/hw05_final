@@ -1,0 +1,21 @@
+<nav class="navbar navbar-light" style="background-color: lightskyblue">
+  <div class="container">
+    {% load static %}
+    <a class="navbar-brand" href="{% url 'posts:index' %}">
+      <img src="{% static 'img/logo1.png' %}" width="30" height="30" class="d-inline-block align-top" alt="">
+      <span style="color:red">Ya</span>tube
+          <a href="{% url 'posts:index' %}">Главная страница</a>
+          <a class="nav-link" href="{% url 'about:author' %}">Об авторе</a>
+          <a class="nav-link" href="{% url 'about:tech' %}">Технологии</a>
+        {% if user.username %}
+          <a class="nav-link" href="{% url 'posts:post_create' %}">Новая запись</a>
+          <a class="nav-link link-light" href="{% url 'users:password_change' %}">Изменить пароль</a>
+          <a class="nav-link link-light" href="{% url 'users:logout' %}">Выйти</a>
+           Пользователь: {{ user.username }}
+        {% else %}
+          <a class="nav-link link-light" href="{% url 'users:login' %}">Войти</a>
+          <a class="nav-link link-light" href="{% url 'users:signup' %}">Регистрация</a>
+        {% endif %}
+    </a>    
+  </div>
+</nav>      
