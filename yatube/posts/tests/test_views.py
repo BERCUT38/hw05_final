@@ -359,44 +359,44 @@ class ViewsTests(TestCase):
         self.assertEqual(commenttxt, commenttxt_start)
 
 
-def test_new_post_for_followers(self):
-    """ Новая запись пользователя появляется в ленте тех, кто на него
+    def test_new_post_for_followers(self):
+        """ Новая запись пользователя появляется в ленте тех, кто на него
             подписан и не появляется в ленте тех, кто не подписан на него.
-    """
-    following = User.objects.create(username='following')
-    Follow.objects.create(user=self.user, author=following)
-    post = Post.objects.create(author=following, text='Сущность бытия')
-    response = self.authorized_client.get(reverse('posts:follow_index'))
-    self.assertIn(post, response.context['page_obj'].object_list)
+        """
+        following = User.objects.create(username='following')
+        Follow.objects.create(user=self.user, author=following)
+        post = Post.objects.create(author=following, text='Сущность бытия')
+        response = self.authorized_client.get(reverse('posts:follow_index'))
+        self.assertIn(post, response.context['page_obj'].object_list)
 
-    self.authorized_client.logout()
-    user_t = User.objects.create_user(
-        username='user_temp'
-    )
-    new_client = Client()
-    new_client.force_login(user_t)
-    response = new_client.get(reverse('posts:follow_index'))
-    self.assertNotIn(post, response.context['page_obj'].object_list)
+        self.authorized_client.logout()
+        user_t = User.objects.create_user(
+            username='user_temp'
+        )
+        new_client = Client()
+        new_client.force_login(user_t)
+        response = new_client.get(reverse('posts:follow_index'))
+        self.assertNotIn(post, response.context['page_obj'].object_list)
 
 
-def test_auth_follower_manipulations(self):
-    """ Авторизованный пользователь может подписываться на других
-        пользователей и удалять их из подписок.
-    """
-    following = User.objects.create(username='following')
-    self.authorized_client.post(reverse(
-        'posts:profile_follow', args=following
-    ))
-    self.assertIs(
-        Follow.objects.filter(
-            user=self.authorized_client, author=following).exists(),
-        True
-    )
+    def test_auth_follower_manipulations(self):
+        """ Авторизованный пользователь может подписываться на других
+            пользователей и удалять их из подписок.
+        """
+        following = User.objects.create(username='following')
+        self.authorized_client.post(reverse(
+            'posts:profile_follow', kwargs={'username': f'{ following.username }'}
+        ))
+        self.assertTrue(
+            Follow.objects.filter(
+                user=self.user).filter(author=following).exists(),
+            'Не подписывается'
+        )
 
-    self.authorized_client.post(reverse(
-        'posts:profile_unfollow', args=following
-    ))
-    self.assertIs(
-        Follow.objects.filter(user=self.user, author=following).exists(),
-        False
-    )
+        self.authorized_client.post(reverse(
+            'posts:profile_unfollow', kwargs={'username': f'{ following.username }'}
+        ))
+        self.assertIs(
+            Follow.objects.filter(user=self.user, author=following).exists(),
+            False
+        )
