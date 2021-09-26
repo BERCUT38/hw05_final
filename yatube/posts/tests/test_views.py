@@ -358,7 +358,6 @@ class ViewsTests(TestCase):
         commenttxt = response.context['comments'][0].text
         self.assertEqual(commenttxt, commenttxt_start)
 
-
     def test_new_post_for_followers(self):
         """ Новая запись пользователя появляется в ленте тех, кто на него
             подписан и не появляется в ленте тех, кто не подписан на него.
@@ -378,14 +377,15 @@ class ViewsTests(TestCase):
         response = new_client.get(reverse('posts:follow_index'))
         self.assertNotIn(post, response.context['page_obj'].object_list)
 
-
     def test_auth_follower_manipulations(self):
         """ Авторизованный пользователь может подписываться на других
             пользователей и удалять их из подписок.
         """
         following = User.objects.create(username='following')
         self.authorized_client.post(reverse(
-            'posts:profile_follow', kwargs={'username': f'{ following.username }'}
+            'posts:profile_follow', kwargs={
+                'username': f'{ following.username }'
+            }
         ))
         self.assertTrue(
             Follow.objects.filter(
@@ -394,7 +394,9 @@ class ViewsTests(TestCase):
         )
 
         self.authorized_client.post(reverse(
-            'posts:profile_unfollow', kwargs={'username': f'{ following.username }'}
+            'posts:profile_unfollow', kwargs={
+                'username': f'{ following.username }'
+            }
         ))
         self.assertIs(
             Follow.objects.filter(user=self.user, author=following).exists(),
