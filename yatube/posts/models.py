@@ -28,7 +28,8 @@ class Post(models.Model):
     image = models.ImageField(
         'Картинка',
         upload_to='posts/',
-        blank=True
+        blank=True,
+        help_text="давай выкладывай"
     )
     group = models.ForeignKey(
         Group,
@@ -72,7 +73,7 @@ class Follow(models.Model):
         User,
         on_delete=models.CASCADE,
         related_name='follower',
-        verbose_name="автор",
+        verbose_name="подписчик",
     )
     author = models.ForeignKey(
         User,

@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.decorators.cache import cache_page
@@ -10,12 +9,17 @@ from .forms import CommentForm, PostForm
 from .models import Follow, Group, Post, User
 
 
+def Pg(request, objects):
+    paginator = Paginator(objects, settings.POP)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return page_obj
+
+
 @cache_page(20)
 def index(request):
     post_list = Post.objects.all().order_by('-pub_date')
-    paginator = Paginator(post_list, settings.POP)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = Pg(request, post_list)
     context = {
         'page_obj': page_obj,
     }
@@ -25,9 +29,7 @@ def index(request):
 def group_posts(request, slug):
     group = get_object_or_404(Group, slug=slug)
     posts = Post.objects.filter(group=group).order_by('-pub_date')
-    paginator = Paginator(posts, settings.POP)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = Pg(request, posts)
     context = {
         'group': group,
         'page_obj': page_obj,
@@ -37,12 +39,11 @@ def group_posts(request, slug):
 
 def profile(request, username):
     user_p = get_object_or_404(User, username=username)
-    posts = Post.objects.filter(author=user_p)
+    posts = user_p.posts.all()
     user = request.user
     following = user.is_authenticated and user_p.following.exists()
     paginator = Paginator(posts, settings.POP)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = Pg(request, posts)
     count = paginator.count
 
     context = {
@@ -131,19 +132,11 @@ def post_edit(request, post_id):
     }
     return render(request, 'posts/create_post.html', context)
 
-# posts/views.py
-
 
 @login_required
 def follow_index(request):
-    user = request.user
-    authors = user.follower.values_list('author', flat=True)
-    posts_list = Post.objects.filter(author__id__in=authors)
-
-    paginator = Paginator(posts_list, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-
+    posts_list = Post.objects.filter(author__following__user=request.user)
+    page_obj = Pg(request, posts_list)
     context = {
         'page_obj': page_obj,
     }
@@ -156,7 +149,9 @@ def profile_follow(request, username):
     author = User.objects.get(username=username)
     user = request.user
     if Follow.objects.filter(user=user, author=author).exists():
-        return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
+        return redirect(reverse_lazy(
+            'posts:profile', args=[username]
+        ))
     else:
         if author != user:
             Follow.objects.create(user=user, author=author)
@@ -164,12 +159,18 @@ def profile_follow(request, username):
                 'posts:profile',
                 username=username
             )
-        return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
+        return redirect(reverse_lazy(
+            'posts:profile', args=[username]
+        ))
+    return redirect(reverse_lazy(
+        'posts:profile', args=[username]
+    ))
 
 
 @login_required
 def profile_unfollow(request, username):
     user = request.user
     Follow.objects.filter(user=user, author__username=username).delete()
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER'))
+    return redirect(reverse_lazy(
+        'posts:profile', args=[username]
+    ))
