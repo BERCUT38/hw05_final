@@ -1,21 +1,27 @@
 import datetime as dt
+import tempfile
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+import tempfile
 
 from ..models import Comment, Follow, Group, Post
 
 User = get_user_model()
 
+MEDIA_ROOT = tempfile.mkdtemp()
 
+
+@override_settings(MEDIA_ROOT=MEDIA_ROOT)
 class ViewsTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         # Создадим запись в БД для проверки доступности адресов
+        cls.following = User.objects.create(username='following')
         cls.user = User.objects.create_user(
             username='author_main'
         )
@@ -81,6 +87,11 @@ class ViewsTests(TestCase):
         post3.pub_date = dt.datetime.utcnow() + deltat
         post3.save()
 
+        Follow.objects.create(user=cls.user, author=cls.following)
+        cls.post_for_followers = Post.objects.create(
+            author=cls.following, text='Сущность бытия'
+        )
+
     def test_about_page_uses_correct_template(self):
         cache.clear()
         """Шаблон правильных адресов"""
@@ -133,11 +144,11 @@ class ViewsTests(TestCase):
         # Проверка: количество постов на первой странице равно 10.
         self.assertEqual(len(response.context['page_obj']), 10)
 
-    def test_index_second_page_contains_4_records(self):
+    def test_index_second_page_contains_6_records(self):
         # Проверка: на второй странице должно быть 4 поста.
         response = self.authorized_client.get(
             reverse('posts:index') + '?page=2')
-        self.assertEqual(len(response.context['page_obj']), 5)
+        self.assertEqual(len(response.context['page_obj']), 6)
 
     def test_post_group_list_pages_show_correct_context(self):
         """Шаблон post_group_list отфильтрован по группе."""
@@ -206,7 +217,7 @@ class ViewsTests(TestCase):
         self.assertEqual(len(response.context['page_obj']), 10)
         response = self.authorized_client.get(
             reverse('posts:index') + '?page=2')
-        self.assertEqual(len(response.context['page_obj']), 5)
+        self.assertEqual(len(response.context['page_obj']), 6)
 
     def test_post_profile_list_picture(self):
         """Шаблон post_profile отфильтрован по пользователю."""
@@ -226,7 +237,7 @@ class ViewsTests(TestCase):
             }))
         self.assertEqual(len(response.context['page_obj']), 10)
 
-    def test_post_profile_list_second_page_contains_4_records(self):
+    def test_post_profile_list_second_page_contains_6_records(self):
         response = (self.authorized_client.get(
             reverse('posts:profile', kwargs={
                 'username': f'{ self.user.username }'
@@ -276,7 +287,7 @@ class ViewsTests(TestCase):
         self.assertEqual(first_object.image, sg)
 
     def test_create_post_list_group_list(self):
-        """ Доп проверки создания поста главная страница группы."""
+        """ Пост попадает на страницу группы."""
         post = Post.objects.get(pk=13)
         posttx = post.text
         postpd = post.pub_date
@@ -294,7 +305,7 @@ class ViewsTests(TestCase):
         self.assertEqual(str(post_date_0), f'{ postpd }')
 
     def test_create_post_list_profile(self):
-        """ Доп проверки создания поста главная страница автора."""
+        """ После создания поста пост попадает на страницу автора."""
         post = Post.objects.get(pk=13)
         posttx = post.text
         postpd = post.pub_date
@@ -316,8 +327,10 @@ class ViewsTests(TestCase):
         self.assertEqual(str(post_group_0), f'{ self.group.title }')
         self.assertEqual(str(post_date_0), f'{ postpd }')
 
-    def test_create_post_list_profile(self):
-        """ Страница другой группы """
+    def test_create_post_list_group_foraign(self):
+        """ Проверка, что этот пост не попал в группу,
+            для которой не был предназначен.
+        """
         response = (self.authorized_client.
                     get(reverse('posts:group_list',
                                 kwargs={'slug': f'{ self.group2.slug }'})))
@@ -326,6 +339,28 @@ class ViewsTests(TestCase):
         self.assertNotEqual(str(post_group_0), f'{ self.group.title }')
 
     def test_context_index_page_cache(self):
+        """ Тест работы кэширования
+            Проверяет, что в первые 20 секунд после создания поста
+            главная страница не меняется
+        """
+        index_content = self.authorized_client.get(
+            reverse('posts:index')).content
+        deltat = dt.timedelta(seconds=60)
+        npost = Post.objects.create(
+            text='new_text',
+            author=self.user,
+            group=self.group3,
+        )
+        npost.pub_date = dt.datetime.utcnow() + deltat
+        index_content_cache = self.authorized_client.get(
+            reverse('posts:index')).content
+        self.assertEqual(index_content, index_content_cache)
+
+    def test_context_index_page_cache_clear(self):
+        """ Тест работы кэширования
+            Проверяет, что, при очистке кеша
+            подгружает новую информацию
+        """
         index_content = self.authorized_client.get(
             reverse('posts:index')).content
         deltat = dt.timedelta(seconds=60)
@@ -336,16 +371,12 @@ class ViewsTests(TestCase):
         )
         npost.pub_date = dt.datetime.utcnow() + deltat
         npost.save()
-
-        index_content_cache = self.authorized_client.get(
-            reverse('posts:index')).content
-        self.assertEqual(index_content, index_content_cache)
         cache.clear()
         index_content_cache_clear = self.authorized_client.get(
             reverse('posts:index')).content
         self.assertNotEqual(index_content, index_content_cache_clear)
 
-    def test_post_detail_pages_show_correct_context_comment(self):
+    def test_comment_create(self):
         """Появление коммента."""
         post = Post.objects.get(pk=15)
         postpk = post.pk
@@ -358,47 +389,76 @@ class ViewsTests(TestCase):
         commenttxt = response.context['comments'][0].text
         self.assertEqual(commenttxt, commenttxt_start)
 
+    def test_comment_create(self):
+        """Авторизованный комментит."""
+        post = Post.objects.get(pk=15)
+        postpk = post.pk
+        data = {
+            'text': 'Коммент'
+        }
+        commenttxt_start = data['text']
+        response = self.authorized_client.post(
+            reverse(
+                'posts:add_comment',
+                args=[postpk]
+            ),
+            data=data,
+            follow=True
+        )
+        response = self.authorized_client.get(
+            reverse('posts:post_detail', args=[postpk])
+        )
+        commenttxt = response.context['comments'][0].text
+        self.assertEqual(commenttxt, commenttxt_start)
+
     def test_new_post_for_followers(self):
         """ Новая запись пользователя появляется в ленте тех, кто на него
-            подписан и не появляется в ленте тех, кто не подписан на него.
+            подписан.
         """
-        following = User.objects.create(username='following')
-        Follow.objects.create(user=self.user, author=following)
-        post = Post.objects.create(author=following, text='Сущность бытия')
         response = self.authorized_client.get(reverse('posts:follow_index'))
-        self.assertIn(post, response.context['page_obj'].object_list)
+        self.assertIn(
+            self.post_for_followers, response.context['page_obj'].object_list
+        )
 
-        self.authorized_client.logout()
+    def test_new_post_for_not_followers(self):
+        """ Новая запись пользователя не появляется в ленте тех,
+            кто не подписан на него.
+        """
         user_t = User.objects.create_user(
             username='user_temp'
         )
         new_client = Client()
         new_client.force_login(user_t)
         response = new_client.get(reverse('posts:follow_index'))
-        self.assertNotIn(post, response.context['page_obj'].object_list)
+        self.assertNotIn(
+            self.post_for_followers, response.context['page_obj'].object_list
+        )
 
-    def test_auth_follower_manipulations(self):
-        """ Авторизованный пользователь может подписываться на других
-            пользователей и удалять их из подписок.
-        """
-        following = User.objects.create(username='following')
+    def test_auth_follower_1(self):
+        """ Тест подписки """
         self.authorized_client.post(reverse(
             'posts:profile_follow', kwargs={
-                'username': f'{ following.username }'
+                'username': f'{ self.following.username }'
             }
         ))
         self.assertTrue(
             Follow.objects.filter(
-                user=self.user).filter(author=following).exists(),
+                user=self.user).filter(author=self.following).exists(),
             'Не подписывается'
         )
 
+    def test_auth_follower_2(self):
+        """ Тест отписки """
+        Follow.objects.create(user=self.user, author=self.following)
+
         self.authorized_client.post(reverse(
             'posts:profile_unfollow', kwargs={
-                'username': f'{ following.username }'
+                'username': f'{ self.following.username }'
             }
         ))
         self.assertIs(
-            Follow.objects.filter(user=self.user, author=following).exists(),
+            Follow.objects.filter(
+                user=self.user, author=self.following
+            ).exists(),
             False
         )

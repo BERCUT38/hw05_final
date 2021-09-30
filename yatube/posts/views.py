@@ -99,7 +99,7 @@ def add_comment(request, post_id):
 
 @login_required
 def post_create(request):
-    form = PostForm(request.POST or None)
+    form = PostForm(request.POST or None, files=request.FILES or None)
     if form.is_valid():
         npost = form.save(commit=False)
         npost.author = request.user
