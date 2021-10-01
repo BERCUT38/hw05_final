@@ -114,7 +114,7 @@ class ViewsTests(TestCase):
         templates_pages_names = {
             reverse('posts:index'): 'posts/index.html',
             reverse(
-                'posts:group_posts', kwargs=slug
+                'posts:group_list', kwargs=slug
             ): 'posts/group_list.html',
             reverse('posts:profile', kwargs=uname): 'posts/profile.html',
             reverse('posts:post_detail',
@@ -160,10 +160,10 @@ class ViewsTests(TestCase):
             reverse('posts:index') + '?page=2')
         self.assertEqual(len(response.context['page_obj']), 6)
 
-    def test_post_group_posts_pages_show_correct_context(self):
-        """Шаблон post_group_posts отфильтрован по группе."""
+    def test_post_group_list_pages_show_correct_context(self):
+        """Шаблон post_group_list отфильтрован по группе."""
         response = (self.authorized_client.
-                    get(reverse('posts:group_posts',
+                    get(reverse('posts:group_list',
                                 kwargs={'slug': f'{ self.group.slug }'})))
         first_object = response.context['page_obj'][0]
         post_text_0 = first_object.text
@@ -178,28 +178,28 @@ class ViewsTests(TestCase):
         self.assertEqual(str(post_group_0), f'{ self.group.title }')
         self.assertEqual(str(post_date_0), f'{ postpd }')
 
-    def test_post_group_posts_picture(self):
-        """Шаблон post_group_posts отфильтрован по группе."""
+    def test_post_group_list_picture(self):
+        """Шаблон post_group_list отфильтрован по группе."""
         response = (self.authorized_client.
-                    get(reverse('posts:group_posts',
+                    get(reverse('posts:group_list',
                                 kwargs={'slug': f'{ self.group2.slug }'})))
         first_object = response.context['page_obj'][0]
         post = Post.objects.get(pk=15)
         sg = post.image
         self.assertEqual(first_object.image, sg)
 
-    def test_post_group_posts_first_page_contains_10_records(self):
+    def test_post_group_list_first_page_contains_10_records(self):
         response = self.authorized_client.get(
-            reverse('posts:group_posts', kwargs={
+            reverse('posts:group_list', kwargs={
                     'slug': f'{ self.group.slug }'})
         )
         self.assertEqual(len(response.context['page_obj']), 10)
 
-    def test_post_group_posts_second_page_contains_4_records(self):
+    def test_post_group_list_second_page_contains_4_records(self):
         response = (
             self.authorized_client.get(
                 reverse(
-                    'posts:group_posts',
+                    'posts:group_list',
                     kwargs={'slug': f'{ self.group.slug }'}
                 ) + '?page=2'))
         self.assertEqual(
@@ -297,13 +297,13 @@ class ViewsTests(TestCase):
         self.assertEqual(str(post_date_0), f'{ postpd }')
         self.assertEqual(first_object.image, sg)
 
-    def test_create_post_list_group_posts(self):
+    def test_create_post_list_group_list(self):
         """ Пост попадает на страницу группы."""
         post = Post.objects.get(pk=13)
         posttx = post.text
         postpd = post.pub_date
         response = (self.authorized_client.
-                    get(reverse('posts:group_posts',
+                    get(reverse('posts:group_list',
                                 kwargs={'slug': f'{ self.group.slug }'})))
         first_object = response.context['page_obj'][0]
         post_text_0 = first_object.text
@@ -343,7 +343,7 @@ class ViewsTests(TestCase):
             для которой не был предназначен.
         """
         response = (self.authorized_client.
-                    get(reverse('posts:group_posts',
+                    get(reverse('posts:group_list',
                                 kwargs={'slug': f'{ self.group.slug }'})))
         count_objects = len(response.context['page_obj'])
         """ Создаем группу и пост внутри теста. """
@@ -360,7 +360,7 @@ class ViewsTests(TestCase):
         )
         post4.pub_date = dt.datetime.utcnow() + deltat
         response = (self.authorized_client.
-                    get(reverse('posts:group_posts',
+                    get(reverse('posts:group_list',
                                 kwargs={'slug': f'{ self.group.slug }'})))
         """ Статус ОК. """
         self.assertEqual(response.status_code, HTTPStatus.OK)
