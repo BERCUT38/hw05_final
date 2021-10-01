@@ -4,16 +4,17 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 import tempfile
+import shutil
 
 from ..forms import PostForm
 from ..models import Group, Post
 
 User = get_user_model()
 
-MEDIA_ROOT = tempfile.mkdtemp()
+TEMP_MEDIA_ROOT = tempfile.mkdtemp()
 
 
-@override_settings(MEDIA_ROOT=MEDIA_ROOT)
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostFormTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -49,6 +50,11 @@ class PostFormTests(TestCase):
             content=small_gif,
             content_type='image/gif'
         )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)    
 
     def test_create_post(self):
         """Тест создания поста"""

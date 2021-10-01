@@ -1,5 +1,6 @@
 import datetime as dt
 import tempfile
+import shutil
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -8,20 +9,22 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 import tempfile
 
+from http import HTTPStatus
 from ..models import Comment, Follow, Group, Post
 
 User = get_user_model()
 
-MEDIA_ROOT = tempfile.mkdtemp()
+TEMP_MEDIA_ROOT = tempfile.mkdtemp()
 
 
-@override_settings(MEDIA_ROOT=MEDIA_ROOT)
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class ViewsTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         # Создадим запись в БД для проверки доступности адресов
         cls.following = User.objects.create(username='following')
+        cls.following2 = User.objects.create(username='following2')
         cls.user = User.objects.create_user(
             username='author_main'
         )
@@ -92,6 +95,11 @@ class ViewsTests(TestCase):
             author=cls.following, text='Сущность бытия'
         )
 
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
+
     def test_about_page_uses_correct_template(self):
         cache.clear()
         """Шаблон правильных адресов"""
@@ -105,7 +113,9 @@ class ViewsTests(TestCase):
         postpk = post.pk
         templates_pages_names = {
             reverse('posts:index'): 'posts/index.html',
-            reverse('posts:group_list', kwargs=slug): 'posts/group_list.html',
+            reverse(
+                'posts:group_posts', kwargs=slug
+            ): 'posts/group_posts.html',
             reverse('posts:profile', kwargs=uname): 'posts/profile.html',
             reverse('posts:post_detail',
                     args=[postpk]): 'posts/post_detail.html',
@@ -150,10 +160,10 @@ class ViewsTests(TestCase):
             reverse('posts:index') + '?page=2')
         self.assertEqual(len(response.context['page_obj']), 6)
 
-    def test_post_group_list_pages_show_correct_context(self):
-        """Шаблон post_group_list отфильтрован по группе."""
+    def test_post_group_posts_pages_show_correct_context(self):
+        """Шаблон post_group_posts отфильтрован по группе."""
         response = (self.authorized_client.
-                    get(reverse('posts:group_list',
+                    get(reverse('posts:group_posts',
                                 kwargs={'slug': f'{ self.group.slug }'})))
         first_object = response.context['page_obj'][0]
         post_text_0 = first_object.text
@@ -168,28 +178,29 @@ class ViewsTests(TestCase):
         self.assertEqual(str(post_group_0), f'{ self.group.title }')
         self.assertEqual(str(post_date_0), f'{ postpd }')
 
-    def test_post_group_list_picture(self):
-        """Шаблон post_group_list отфильтрован по группе."""
+    def test_post_group_posts_picture(self):
+        """Шаблон post_group_posts отфильтрован по группе."""
         response = (self.authorized_client.
-                    get(reverse('posts:group_list',
+                    get(reverse('posts:group_posts',
                                 kwargs={'slug': f'{ self.group2.slug }'})))
         first_object = response.context['page_obj'][0]
         post = Post.objects.get(pk=15)
         sg = post.image
         self.assertEqual(first_object.image, sg)
 
-    def test_post_group_list_first_page_contains_10_records(self):
+    def test_post_group_posts_first_page_contains_10_records(self):
         response = self.authorized_client.get(
-            reverse('posts:group_list', kwargs={
+            reverse('posts:group_posts', kwargs={
                     'slug': f'{ self.group.slug }'})
         )
         self.assertEqual(len(response.context['page_obj']), 10)
 
-    def test_post_group_list_second_page_contains_4_records(self):
+    def test_post_group_posts_second_page_contains_4_records(self):
         response = (
             self.authorized_client.get(
                 reverse(
-                    'posts:group_list', kwargs={'slug': f'{ self.group.slug }'}
+                    'posts:group_posts',
+                    kwargs={'slug': f'{ self.group.slug }'}
                 ) + '?page=2'))
         self.assertEqual(
             len(response.context['page_obj']), 3
@@ -286,13 +297,13 @@ class ViewsTests(TestCase):
         self.assertEqual(str(post_date_0), f'{ postpd }')
         self.assertEqual(first_object.image, sg)
 
-    def test_create_post_list_group_list(self):
+    def test_create_post_list_group_posts(self):
         """ Пост попадает на страницу группы."""
         post = Post.objects.get(pk=13)
         posttx = post.text
         postpd = post.pub_date
         response = (self.authorized_client.
-                    get(reverse('posts:group_list',
+                    get(reverse('posts:group_posts',
                                 kwargs={'slug': f'{ self.group.slug }'})))
         first_object = response.context['page_obj'][0]
         post_text_0 = first_object.text
@@ -332,11 +343,29 @@ class ViewsTests(TestCase):
             для которой не был предназначен.
         """
         response = (self.authorized_client.
-                    get(reverse('posts:group_list',
-                                kwargs={'slug': f'{ self.group2.slug }'})))
-        first_object = response.context['page_obj'][0]
-        post_group_0 = first_object.group
-        self.assertNotEqual(str(post_group_0), f'{ self.group.title }')
+                    get(reverse('posts:group_posts',
+                                kwargs={'slug': f'{ self.group.slug }'})))
+        count_objects = len(response.context['page_obj'])
+        """ Создаем группу и пост внутри теста. """
+        group4 = Group.objects.create(
+            title='название группы4',
+            slug='slag4',
+            description='описание4',
+        )
+        deltat = dt.timedelta(seconds=100)
+        post4 = Post.objects.create(
+            text='Тестовый текст4',
+            author=self.user,
+            group=group4,
+        )
+        post4.pub_date = dt.datetime.utcnow() + deltat
+        response = (self.authorized_client.
+                    get(reverse('posts:group_posts',
+                                kwargs={'slug': f'{ self.group.slug }'})))
+        """ Статус ОК. """
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        count_objects_new = len(response.context['page_obj'])
+        self.assertEqual(count_objects, count_objects_new)
 
     def test_context_index_page_cache(self):
         """ Тест работы кэширования
@@ -389,7 +418,7 @@ class ViewsTests(TestCase):
         commenttxt = response.context['comments'][0].text
         self.assertEqual(commenttxt, commenttxt_start)
 
-    def test_comment_create(self):
+    def test_comment_create_auth(self):
         """Авторизованный комментит."""
         post = Post.objects.get(pk=15)
         postpk = post.pk
@@ -408,8 +437,12 @@ class ViewsTests(TestCase):
         response = self.authorized_client.get(
             reverse('posts:post_detail', args=[postpk])
         )
-        commenttxt = response.context['comments'][0].text
-        self.assertEqual(commenttxt, commenttxt_start)
+        comment_auth = response.context['comments'][0].author
+        comment_txt = response.context['comments'][0].text
+        comment_post = response.context['comments'][0].post
+        self.assertEqual(comment_txt, commenttxt_start)
+        self.assertEqual(self.user, comment_auth)
+        self.assertEqual(post, comment_post)
 
     def test_new_post_for_followers(self):
         """ Новая запись пользователя появляется в ленте тех, кто на него
@@ -436,26 +469,32 @@ class ViewsTests(TestCase):
 
     def test_auth_follower_1(self):
         """ Тест подписки """
+        count_follow = len(Follow.objects.all())
         self.authorized_client.post(reverse(
             'posts:profile_follow', kwargs={
-                'username': f'{ self.following.username }'
+                'username': f'{ self.following2.username }'
             }
         ))
+        response = self.authorized_client.get('/follow/')
+        count_follow2 = len(Follow.objects.all())
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertNotEqual(count_follow, count_follow2)
         self.assertTrue(
             Follow.objects.filter(
-                user=self.user).filter(author=self.following).exists(),
+                user=self.user, author=self.following2).exists(),
             'Не подписывается'
         )
 
     def test_auth_follower_2(self):
         """ Тест отписки """
-        Follow.objects.create(user=self.user, author=self.following)
-
+        count_follow = len(Follow.objects.all())
         self.authorized_client.post(reverse(
             'posts:profile_unfollow', kwargs={
                 'username': f'{ self.following.username }'
             }
         ))
+        count_follow2 = len(Follow.objects.all())
+        self.assertNotEqual(count_follow, count_follow2)
         self.assertIs(
             Follow.objects.filter(
                 user=self.user, author=self.following

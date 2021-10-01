@@ -34,7 +34,7 @@ def group_posts(request, slug):
         'group': group,
         'page_obj': page_obj,
     }
-    return render(request, 'posts/group_list.html', context)
+    return render(request, 'posts/group_posts.html', context)
 
 
 def profile(request, username):
@@ -148,20 +148,18 @@ def profile_follow(request, username):
     """ Подписка """
     author = User.objects.get(username=username)
     user = request.user
-    if Follow.objects.filter(user=user, author=author).exists():
+    if Follow.objects.filter(
+        user=user, author=author
+    ).exists() or author == user:
         return redirect(reverse_lazy(
             'posts:profile', args=[username]
         ))
     else:
-        if author != user:
-            Follow.objects.create(user=user, author=author)
-            return redirect(
-                'posts:profile',
-                username=username
-            )
-        return redirect(reverse_lazy(
-            'posts:profile', args=[username]
-        ))
+        Follow.objects.create(user=user, author=author)
+        return redirect(
+            'posts:profile',
+            username=username
+        )
     return redirect(reverse_lazy(
         'posts:profile', args=[username]
     ))
