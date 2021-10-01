@@ -115,7 +115,7 @@ class ViewsTests(TestCase):
             reverse('posts:index'): 'posts/index.html',
             reverse(
                 'posts:group_posts', kwargs=slug
-            ): 'posts/group_posts.html',
+            ): 'posts/group_list.html',
             reverse('posts:profile', kwargs=uname): 'posts/profile.html',
             reverse('posts:post_detail',
                     args=[postpk]): 'posts/post_detail.html',

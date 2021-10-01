@@ -48,7 +48,7 @@ class PostURLTests(TestCase):
         # Шаблоны по адресам
         templates_url_names = {
             '/': 'posts/index.html',
-            f'/group/{self.group.slug}/': 'posts/group_posts.html',
+            f'/group/{self.group.slug}/': 'posts/group_list.html',
             f'/profile/{self.user1.username}/': 'posts/profile.html',
             f'/posts/{self.post.pk}/': 'posts/post_detail.html',
         }
