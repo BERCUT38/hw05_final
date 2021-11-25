@@ -25,8 +25,12 @@ SECRET_KEY = 'b8j4+b$u_6&px@ljt$*httc2-v(j=6u=uu@um3!5&k4i&30nnw'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', 'testserver']
-
+ALLOWED_HOSTS = [
+    '127.0.0.1', 
+    'testserver',
+    'www.BERCUT38.pythonanywhere.com',
+    'BERCUT38.pythonanywhere.com',
+] 
 
 # Application definition
 
@@ -41,7 +45,8 @@ INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'about.apps.AboutConfig',
     'core',
-    'sorl.thumbnail'
+    'sorl.thumbnail',
+    'debug_toolbar'
 ]
 
 MIDDLEWARE = [
@@ -52,6 +57,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
 ROOT_URLCONF = 'yatube.urls'
@@ -154,3 +160,7 @@ CACHES = {
 }
 
 CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
+
+INTERNAL_IPS = [
+    '127.0.0.1',
+] 
