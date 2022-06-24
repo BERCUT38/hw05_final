@@ -12,3 +12,4 @@ Content-Type: application/json
 GET  https://api.github.com/users/yandex-praktikum 
 ###
 GET https://api.github.com/users/BERCUT38 
+#1
