@@ -69,5 +69,5 @@ python3 manage.py runserver
 Будник Сергей Александрович  
 Python-разработчик (Backend)  
 Россия, г. Краснодар  
-E-mail: Bercut38877@yandex.ru  
+E-mail: bercut38877@yandex.ru  
 Telegram: @Bercut38
